@@ -21,7 +21,7 @@ import static android.app.Activity.RESULT_OK;
 
 public class DroneDLApp extends Application{
 
-    public static final String FLAG_CONNECTION_CHANGE = "fpv_tutorial_connection_change";
+    public static final String FLAG_CONNECTION_CHANGE = "DroneDL_connection_change";
 
     private static BaseProduct mProduct;
 

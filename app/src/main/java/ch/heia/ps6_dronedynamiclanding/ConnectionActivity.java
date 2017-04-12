@@ -19,6 +19,7 @@ import dji.sdk.products.Aircraft;
 
 public class ConnectionActivity extends Activity implements View.OnClickListener {
     private static final String TAG = ConnectionActivity.class.getName();
+
     private TextView mTextConnectionStatus;
     private TextView mTextProduct;
     private Button mBtnOpen;
@@ -70,19 +71,28 @@ public class ConnectionActivity extends Activity implements View.OnClickListener
         this.finish();
     }
 
-    protected BroadcastReceiver mReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            refreshSDKRelativeUI();
-        }
-    };
-
     @Override
     protected void onDestroy() {
         Log.e(TAG, "onDestroy");
         unregisterReceiver(mReceiver);
         super.onDestroy();
     }
+
+    private void initUI() {
+        mTextConnectionStatus = (TextView) findViewById(R.id.text_connection_status);
+        mTextProduct = (TextView) findViewById(R.id.text_product_info);
+        mBtnOpen = (Button) findViewById(R.id.btn_open);
+        mBtnOpen.setOnClickListener(this);
+        //TODO: set this to false, true is just for testing
+        mBtnOpen.setEnabled(false);
+    }
+
+    protected BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            refreshSDKRelativeUI();
+        }
+    };
 
     private void refreshSDKRelativeUI() {
         BaseProduct mProduct = DroneDLApp.getProductInstance();
@@ -104,14 +114,8 @@ public class ConnectionActivity extends Activity implements View.OnClickListener
         }
     }
 
-    private void initUI() {
-        mTextConnectionStatus = (TextView) findViewById(R.id.text_connection_status);
-        mTextProduct = (TextView) findViewById(R.id.text_product_info);
-        mBtnOpen = (Button) findViewById(R.id.btn_open);
-        mBtnOpen.setOnClickListener(this);
-        //TODO: set this to false, true is just for testing
-        mBtnOpen.setEnabled(true);
-    }
+
+
     @Override
     public void onClick(View v) {
         switch (v.getId()) {

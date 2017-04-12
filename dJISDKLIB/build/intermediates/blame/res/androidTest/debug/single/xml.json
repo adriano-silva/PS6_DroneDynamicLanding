@@ -2,5 +2,9 @@
     {
         "merged": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\res\\merged\\androidTest\\debug\\xml\\accessory_filter.xml",
         "source": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\bundles\\debug\\res\\xml\\accessory_filter.xml"
+    },
+    {
+        "merged": "C:\\Android_Studio\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\res\\merged\\androidTest\\debug\\xml\\accessory_filter.xml",
+        "source": "C:\\Android_Studio\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\bundles\\debug\\res\\xml\\accessory_filter.xml"
     }
 ]
