@@ -12,6 +12,13 @@
             android:layout_height="match_parent"
             android:layout_gravity="center"
             android:layout_centerHorizontal="true" />
+
+        <ch.heia.ps6_dronedynamiclanding.BarcodeView
+            android:id="@+id/bcView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:layout_centerHorizontal="true"/>
         <Button
             android:id="@+id/btn_stop"
             android:layout_width="@dimen/btn_width"

@@ -8,8 +8,11 @@ import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.io.Console;
+
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
+import dji.common.util.CommonCallbacks;
 import dji.sdk.base.BaseComponent;
 import dji.sdk.base.BaseProduct;
 import dji.sdk.camera.Camera;
@@ -22,8 +25,9 @@ import static android.app.Activity.RESULT_OK;
 public class DroneDLApp extends Application{
 
     public static final String FLAG_CONNECTION_CHANGE = "DroneDL_connection_change";
-
+    private static final String TAG = DroneDLApp.class.getName();
     private static BaseProduct mProduct;
+
 
     public Handler mHandler;
 
@@ -44,6 +48,19 @@ public class DroneDLApp extends Application{
 
     public static boolean isHandHeldConnected() {
         return getProductInstance() != null && getProductInstance() instanceof HandHeld;
+    }
+
+    public static void emergencyStop(){
+        ((Aircraft)getProductInstance()).getFlightController().setVirtualStickModeEnabled(false, new CommonCallbacks.CompletionCallback() {
+            @Override
+            public void onResult(DJIError djiError) {
+                if (djiError !=null){
+                    Log.d(TAG, djiError.getDescription());
+                }else{
+                    Log.d(TAG, "Emergency Stop succeeded");
+                }
+            }
+        });
     }
 
     public static synchronized Camera getCameraInstance() {

@@ -32,6 +32,10 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     private Button mStopBtn, mMapBtn;
     private ToggleButton mModeBtn;
     private TextView recordingTime;
+    private BarcodeView bcView;
+    private byte[] videoBuffer;
+    private int sWidth = -1;
+    private int sHeight = -1;
 
     private Handler handler;
 
@@ -67,7 +71,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         super.onResume();
         initPreviewer();
         onProductChange();
-        if(mVideoSurface == null) {
+        bcView.resume(mVideoSurface, sWidth, sHeight);
+        if(mVideoSurface== null) {
             Log.e(TAG, "mVideoSurface is null");
         }
     }
@@ -76,6 +81,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     public void onPause() {
         Log.e(TAG, "onPause");
         uninitPreviewer();
+        bcView.pause();
         super.onPause();
     }
     @Override
@@ -97,6 +103,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     private void initUI() {
         // init mVideoSurface
         mVideoSurface = (TextureView)findViewById(R.id.video_previewer_surface);
+        bcView = (BarcodeView)findViewById(R.id.bcView);
         recordingTime = (TextView) findViewById(R.id.timer);
         mStopBtn = (Button) findViewById(R.id.btn_stop);
         mModeBtn = (ToggleButton) findViewById(R.id.btn_mode);
@@ -105,18 +112,22 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         if (null != mVideoSurface) {
             mVideoSurface.setSurfaceTextureListener(this);
         }
-
         mStopBtn.setOnClickListener(this);
         mMapBtn.setOnClickListener(this);
         recordingTime.setVisibility(View.INVISIBLE);
         mModeBtn.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                bcView.setLandMode(isChecked);
                 //TODO: changer le mode (follow ou land)
             }
         });
     }
 
+    /*
+    Check the product connection status, then invoke the SurfaceTextureListerner method.
+    If VideoFeeder has video feeds, and the size of it is larger than 0, set the mReceivedVideoDataCallBack as its "callback"
+     */
     private void initPreviewer() {
         BaseProduct product = DroneDLApp.getProductInstance();
         if (product == null || !product.isConnected()) {
@@ -147,6 +158,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         Log.e(TAG, "onSurfaceTextureAvailable");
         if (mCodecManager == null) {
             mCodecManager = new DJICodecManager(this, surface, width, height);
+            sHeight = height;
+            sWidth = width;
         }
     }
     @Override
@@ -178,6 +191,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btn_stop:{
+                DroneDLApp.emergencyStop();
+                bcView.mainThread.interrupt();
                 break;
             }
             case R.id.btn_map:{

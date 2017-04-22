@@ -69,7 +69,7 @@
         </activity>
         <activity
             android:name=".MainActivity"
-            android:screenOrientation="landscape"
+            android:screenOrientation="reverseLandscape"
             android:theme="@style/Theme.AppCompat.NoActionBar"></activity>
 
         <!--
