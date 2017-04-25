@@ -1,10 +1,13 @@
 package ch.heia.ps6_dronedynamiclanding;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.nfc.Tag;
 import android.os.Handler;
@@ -15,6 +18,7 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.view.TextureView;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 
@@ -22,6 +26,8 @@ import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.barcode.Barcode;
 import com.google.android.gms.vision.barcode.BarcodeDetector;
 
+import dji.common.camera.SettingsDefinitions;
+import dji.common.flightcontroller.FlightControlState;
 import dji.sdk.base.BaseProduct;
 import dji.sdk.products.Aircraft;
 import dji.sdk.sdkmanager.DJISDKManager;
@@ -37,11 +43,13 @@ public class BarcodeView extends View{
 
     private BarcodeDetector detector;
     private Paint paint;
+    private Rect[] facesArray = null;
+    private final Object lock = new Object(); //Drawing mutex
 
     private int viewWidth = -1;
     private int viewHeight = -1;
 
-    private Rect targetRect = new Rect(890,700,1030,840);
+    private Rect targetRect = new Rect(500,275,750,515);
 
     private boolean landMode = false;
 
@@ -81,6 +89,15 @@ public class BarcodeView extends View{
         paint.setColor(Color.GREEN);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4f);
+
+        currentDrone = DJISDKManager.getInstance().getProduct();
+
+        currentDrone.getCamera().setFocusMode(SettingsDefinitions.FocusMode.AUTO, null);
+
+        //Point in the screen for the focus
+        PointF point = new PointF(1,1);
+        currentDrone.getCamera().setFocusTarget(point, null);
+
     }
 
     public void resume(final TextureView cameraView, int sWidth, int sHeight){
@@ -88,9 +105,9 @@ public class BarcodeView extends View{
             this.viewWidth = sWidth;
             this.viewHeight = sHeight;
             this.cameraView = cameraView;
-            mainThread = new CascadingThread(ctx);
-            mainThread.start();
         }
+        mainThread = new CascadingThread(ctx);
+        mainThread.start();
     }
 
     public void pause(){
@@ -108,11 +125,9 @@ public class BarcodeView extends View{
     public class CascadingThread extends Thread{
         private final Handler handler;
         boolean interrupted = false;
-        BaseProduct mProduct;
 
         private CascadingThread(final Context ctx) {
             handler = new Handler(ctx.getMainLooper());
-            mProduct = DJISDKManager.getInstance().getProduct();
         }
 
         public void interrupt() {
@@ -125,25 +140,41 @@ public class BarcodeView extends View{
             int halfHeight = targetRect.height()/2;
             Log.d(TAG, "Thread started");
             while (!interrupted) {
+                Log.d(TAG, "in Thread");
                 if (viewWidth > -1 && viewHeight > -1){
                     Bitmap source = cameraView.getBitmap();
-                    Log.d(TAG, (source==null)+"");
                     if (source != null){
+
                         Log.d(TAG, "source ok");
                         Frame convFram = new Frame.Builder().setBitmap(source).build();
                         SparseArray<Barcode> barcodes = detector.detect(convFram);
                         Log.d(TAG, barcodes.toString());
-                        Log.d(TAG, "LandMOde: "+landMode+"");
                         if (barcodes.size() > 0 ) {
                             Log.d(TAG, "QR Code detected");
 
                             //when qr code detected, drone takes off
-                            ((Aircraft) mProduct).getFlightController().turnOnMotors(null);
-                            ((Aircraft) mProduct).getFlightController().startTakeoff(null);
+                            //((Aircraft) mProduct).getFlightController().turnOnMotors(null);
+                            //((Aircraft) mProduct).getFlightController().startTakeoff(null);
 
 
+
+                            Rect qrRect =  barcodes.valueAt(0).getBoundingBox();
+
+                            synchronized (lock) {
+                                facesArray = new Rect[2];
+                                facesArray[0] = targetRect;
+                                facesArray[1] = qrRect;
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        invalidate();
+                                    }
+                                });
+                            }
                             //TODO : tester si qr code dans targetRect, ou targetRect dans le QRCode. Sinon, adjustMovements. Si oui, overOrder
 
+                        }else{
+                            noQRFound();
                         }
                     }
                 }
@@ -194,7 +225,16 @@ public class BarcodeView extends View{
          * movement as follow : currentDrone.moveDroneInMeters(0f,0f,0f,0f);
          */
         private void noQRFound(){
-
+            synchronized (lock) {
+                facesArray = new Rect[1];
+                facesArray[0] = targetRect;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        invalidate();
+                    }
+                });
+            }
         }
 
         private void runOnUiThread(Runnable r) {
@@ -218,6 +258,36 @@ public class BarcodeView extends View{
 
     public void setLandMode(boolean landMode) {
         this.landMode = landMode;
+    }
+
+    public String getAltitude(){
+        String result = "UltraSonic disabled";
+        if (((Aircraft) currentDrone).getFlightController().getState().isUltrasonicBeingUsed()){
+            result = ((Aircraft) currentDrone).getFlightController().getState().getUltrasonicHeightInMeters()+"";
+        }
+        return result;
+    }
+
+    /**
+     * Used to display custom shapes over the texture. We use this to draw the rectangles.
+     * @param canvas the canvas that will get the rectangles drawn on
+     */
+    @Override
+    protected void onDraw(Canvas canvas) {
+        synchronized(lock) {
+            if (facesArray != null && facesArray.length > 0) {
+                for (Rect target : facesArray) {
+                    if(target == targetRect){
+                        paint.setColor(Color.GREEN);
+                    }else{
+                        paint.setColor(Color.RED);
+                    }
+                    canvas.drawRect(target, paint);
+                }
+            }
+        }
+
+        super.onDraw(canvas);
     }
 }
 

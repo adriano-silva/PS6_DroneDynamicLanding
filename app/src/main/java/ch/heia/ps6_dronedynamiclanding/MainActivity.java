@@ -31,11 +31,12 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     protected TextureView mVideoSurface = null;
     private Button mStopBtn, mMapBtn;
     private ToggleButton mModeBtn;
-    private TextView recordingTime;
+    private TextView altitudeTxt;
     private BarcodeView bcView;
     private byte[] videoBuffer;
     private int sWidth = -1;
     private int sHeight = -1;
+    private boolean interrupted = true;
 
     private Handler handler;
 
@@ -75,6 +76,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         if(mVideoSurface== null) {
             Log.e(TAG, "mVideoSurface is null");
         }
+        interrupted=false;
+        startAltitudeThread();
     }
 
     @Override
@@ -82,6 +85,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         Log.e(TAG, "onPause");
         uninitPreviewer();
         bcView.pause();
+        interrupted=true;
         super.onPause();
     }
     @Override
@@ -104,7 +108,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         // init mVideoSurface
         mVideoSurface = (TextureView)findViewById(R.id.video_previewer_surface);
         bcView = (BarcodeView)findViewById(R.id.bcView);
-        recordingTime = (TextView) findViewById(R.id.timer);
+        altitudeTxt = (TextView) findViewById(R.id.altitude);
         mStopBtn = (Button) findViewById(R.id.btn_stop);
         mModeBtn = (ToggleButton) findViewById(R.id.btn_mode);
         mMapBtn = (Button) findViewById(R.id.btn_map);
@@ -114,7 +118,6 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         }
         mStopBtn.setOnClickListener(this);
         mMapBtn.setOnClickListener(this);
-        recordingTime.setVisibility(View.INVISIBLE);
         mModeBtn.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -204,5 +207,29 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 break;
         }
     }
+
+    private void startAltitudeThread() {
+        Thread th = new Thread(new Runnable() {
+            public void run() {
+                while (!interrupted) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            altitudeTxt.setText("Altitude: "+bcView.getAltitude()+"m");
+                        }
+                    });
+                    try {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+        th.start();
+    }
+
+
 
 }
