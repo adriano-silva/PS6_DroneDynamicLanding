@@ -28,9 +28,14 @@ import com.google.android.gms.vision.barcode.BarcodeDetector;
 
 import dji.common.camera.SettingsDefinitions;
 import dji.common.flightcontroller.FlightControlState;
+import dji.common.flightcontroller.virtualstick.FlightControlData;
+import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
+import dji.common.flightcontroller.virtualstick.YawControlMode;
 import dji.sdk.base.BaseProduct;
 import dji.sdk.products.Aircraft;
 import dji.sdk.sdkmanager.DJISDKManager;
+
+import static android.R.attr.value;
 
 
 public class BarcodeView extends View{
@@ -76,7 +81,7 @@ public class BarcodeView extends View{
     }
 
     private void init(Context context){
-        detector = new BarcodeDetector.Builder(context).setBarcodeFormats(Barcode.DATA_MATRIX | Barcode.QR_CODE).build();
+        detector = new BarcodeDetector.Builder(context).setBarcodeFormats(Barcode.QR_CODE).build();
 
         if(!detector.isOperational()){
             Toast.makeText(context, "Could not set up the QR detector!", Toast.LENGTH_SHORT).show();
@@ -93,9 +98,11 @@ public class BarcodeView extends View{
         currentDrone = DJISDKManager.getInstance().getProduct();
 
         currentDrone.getCamera().setFocusMode(SettingsDefinitions.FocusMode.AUTO, null);
+        currentDrone.getCamera().setExposureMode(SettingsDefinitions.ExposureMode.PROGRAM, null);
+
 
         //Point in the screen for the focus
-        PointF point = new PointF(1,1);
+        PointF point = new PointF(600,600);
         currentDrone.getCamera().setFocusTarget(point, null);
 
     }
@@ -140,11 +147,10 @@ public class BarcodeView extends View{
             int halfHeight = targetRect.height()/2;
             Log.d(TAG, "Thread started");
             while (!interrupted) {
-                Log.d(TAG, "in Thread");
                 if (viewWidth > -1 && viewHeight > -1){
                     Bitmap source = cameraView.getBitmap();
                     if (source != null){
-
+                        //// TODO: 25.04.2017 add if (is drone flying?) 
                         Log.d(TAG, "source ok");
                         Frame convFram = new Frame.Builder().setBitmap(source).build();
                         SparseArray<Barcode> barcodes = detector.detect(convFram);
@@ -152,13 +158,8 @@ public class BarcodeView extends View{
                         if (barcodes.size() > 0 ) {
                             Log.d(TAG, "QR Code detected");
 
-                            //when qr code detected, drone takes off
-                            //((Aircraft) mProduct).getFlightController().turnOnMotors(null);
-                            //((Aircraft) mProduct).getFlightController().startTakeoff(null);
-
-
-
                             Rect qrRect =  barcodes.valueAt(0).getBoundingBox();
+                            Point[] qrPoints = barcodes.valueAt(0).cornerPoints;
 
                             synchronized (lock) {
                                 facesArray = new Rect[2];
@@ -173,6 +174,8 @@ public class BarcodeView extends View{
                             }
                             //TODO : tester si qr code dans targetRect, ou targetRect dans le QRCode. Sinon, adjustMovements. Si oui, overOrder
 
+                            //adjustMovements(qrPoints);
+
                         }else{
                             noQRFound();
                         }
@@ -185,20 +188,48 @@ public class BarcodeView extends View{
          * is a triangulation from the screen to the 3D world. The main trick is to use small value
          * so the drone will be more precise. It corrects the movements on every axis, still it
          * does not affect the yaw.
-         * @param halfWidth half of the view width
-         * @param halfHeight hal of the view height
          * @param qrPoints the coordinates of the QR rectangle
-         * @param cAlt the current altitude
          */
-        private void adjustMovements(int halfWidth, int halfHeight, Point[] qrPoints, double cAlt){
+        private void adjustMovements(Point[] qrPoints){
 
-            int qrWidth = qrPoints[0].x - qrPoints[1].x;
-            int qrHeight = qrPoints[0].y - qrPoints[2].y ;
+            int qrWitdh = qrPoints[1].x - qrPoints[1].x;
+            int qrHeight = qrPoints[0].y - qrPoints[2].y;
+            int qrLeft = qrPoints[0].x;
+            int qrRight = qrPoints[1].x;
+            int qrTop = qrPoints[0].y;
+            int qrBottom = qrPoints[2].y;
 
-            int centerXQR = qrPoints[1].x - (qrWidth/2);
-            int centerYQR = qrPoints[0].y - (qrHeight/2);
+            //center point of the QR Square
+            Point qrMassPoint = new Point(qrPoints[1].x - (qrWitdh/2),qrPoints[0].y - (qrHeight/2));
+            if(((Aircraft)currentDrone).getFlightController().isVirtualStickControlModeAvailable()){
+                if(!((Aircraft)currentDrone).getFlightController().isVirtualStickAdvancedModeEnabled()){
+                    ((Aircraft)currentDrone).getFlightController().setVirtualStickAdvancedModeEnabled(true);
+                    Log.d(TAG, "Virtual Stick Advanced Mode enabled");
+                    ((Aircraft)currentDrone).getFlightController().setRollPitchControlMode(RollPitchControlMode.VELOCITY);
+                    ((Aircraft)currentDrone).getFlightController().setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
+                }
+            }
+            FlightControlData move = new FlightControlData(0,0,0,0);
+            if (qrMassPoint.x < targetRect.left){
 
+                //move drone to right
+                move.setRoll(1);
 
+            }else if(qrMassPoint.x> targetRect.right){
+                //move drone to left
+                move.setRoll(-1);
+            }
+            if (qrMassPoint.y < targetRect.bottom){
+                //move drone top
+            }else if (qrMassPoint.y > targetRect.top){
+                //move drone bottom
+            }
+            if (targetRect.contains(qrLeft,qrTop,qrRight,qrBottom)){
+                //decrease altitude
+                move.setVerticalThrottle(-1);
+            }
+
+            ((Aircraft)currentDrone).getFlightController().sendVirtualStickFlightControlData(move,null);
             // recevoir l'instance de baseProduct
             //((Aircraft) BaseProduct).getFlightController().;
         }
