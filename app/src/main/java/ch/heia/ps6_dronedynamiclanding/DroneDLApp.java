@@ -121,7 +121,7 @@ public class DroneDLApp extends Application{
                 });
 
             }
-            Log.e("TAG", error.toString());
+            Log.e("TAG",error.toString());
         }
 
         //Listens to the connected product changing, including two parts, component changing or product connection changing.

@@ -12,12 +12,12 @@
         "source": "C:\\Android_Studio\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\bundles\\debug\\res\\raw\\iframe_960x720_3s.h264"
     },
     {
-        "merged": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw\\arrow_v02.3ds",
-        "source": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\bundles\\debug\\res\\raw\\arrow_v02.3ds"
-    },
-    {
         "merged": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw\\iframe_640x480.h264",
         "source": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\bundles\\debug\\res\\raw\\iframe_640x480.h264"
+    },
+    {
+        "merged": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw\\arrow_v02.3ds",
+        "source": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\bundles\\debug\\res\\raw\\arrow_v02.3ds"
     },
     {
         "merged": "C:\\Users\\Adriano\\Documents\\DJIApp\\PS6_DroneDynamicLanding\\dJISDKLIB\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw\\iframe_p4p_720_4x3.h264",

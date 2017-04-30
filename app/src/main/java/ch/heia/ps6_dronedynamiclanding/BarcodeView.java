@@ -16,8 +16,10 @@ import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.Display;
 import android.view.TextureView;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,14 +29,21 @@ import com.google.android.gms.vision.barcode.Barcode;
 import com.google.android.gms.vision.barcode.BarcodeDetector;
 
 import dji.common.camera.SettingsDefinitions;
+import dji.common.error.DJIError;
 import dji.common.flightcontroller.FlightControlState;
+import dji.common.flightcontroller.FlightOrientationMode;
 import dji.common.flightcontroller.virtualstick.FlightControlData;
+import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
+import dji.common.flightcontroller.virtualstick.VerticalControlMode;
 import dji.common.flightcontroller.virtualstick.YawControlMode;
+import dji.common.util.CommonCallbacks;
 import dji.sdk.base.BaseProduct;
 import dji.sdk.products.Aircraft;
 import dji.sdk.sdkmanager.DJISDKManager;
 
+import static android.R.attr.cycles;
+import static android.R.attr.screenSize;
 import static android.R.attr.value;
 
 
@@ -54,9 +63,16 @@ public class BarcodeView extends View{
     private int viewWidth = -1;
     private int viewHeight = -1;
 
+    private final int skipFrameLimit = 200;
+
     private Rect targetRect = new Rect(500,275,750,515);
 
     private boolean landMode = false;
+
+    private Float speed = 0.2f;
+
+    private static final int TIMEBETWEENSCAN = 100; //in ms
+
 
     private static final String TAG = BarcodeView.class.getName();
 
@@ -73,7 +89,6 @@ public class BarcodeView extends View{
         init(context);
     }
 
-    //TODO regarder si c'est bien ce consctructeur qui est appelé et non un des deux en dessus.
     public BarcodeView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         Log.d(TAG, "constructor 3");
@@ -105,14 +120,23 @@ public class BarcodeView extends View{
         PointF point = new PointF(600,600);
         currentDrone.getCamera().setFocusTarget(point, null);
 
+        //Getting the coordinates for the Target rectangle
+        WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        Display display = wm.getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        targetRect = new Rect((size.x/2)-125,(size.y/2)-125,(size.x/2)+125,(size.y/2)+125);
+
     }
 
     public void resume(final TextureView cameraView, int sWidth, int sHeight){
         if(getVisibility() == View.VISIBLE){
-            this.viewWidth = sWidth;
-            this.viewHeight = sHeight;
-            this.cameraView = cameraView;
+
+
         }
+        //this.viewWidth = sWidth;
+        //this.viewHeight = sHeight;
+        this.cameraView = cameraView;
         mainThread = new CascadingThread(ctx);
         mainThread.start();
     }
@@ -143,44 +167,62 @@ public class BarcodeView extends View{
 
         @Override
         public void run() {
+
             int halfWidth = targetRect.width()/2;
             int halfHeight = targetRect.height()/2;
             Log.d(TAG, "Thread started");
+            int counter = 0;
+
             while (!interrupted) {
-                if (viewWidth > -1 && viewHeight > -1){
-                    Bitmap source = cameraView.getBitmap();
-                    if (source != null){
-                        //// TODO: 25.04.2017 add if (is drone flying?) 
-                        Log.d(TAG, "source ok");
-                        Frame convFram = new Frame.Builder().setBitmap(source).build();
-                        SparseArray<Barcode> barcodes = detector.detect(convFram);
-                        Log.d(TAG, barcodes.toString());
-                        if (barcodes.size() > 0 ) {
-                            Log.d(TAG, "QR Code detected");
 
-                            Rect qrRect =  barcodes.valueAt(0).getBoundingBox();
-                            Point[] qrPoints = barcodes.valueAt(0).cornerPoints;
+                /*if (counter == skipFrameLimit) {
+                    counter = 0;*/
+                    if (viewWidth > -1 && viewHeight > -1) {
+                        Bitmap source = cameraView.getBitmap();
 
-                            synchronized (lock) {
-                                facesArray = new Rect[2];
-                                facesArray[0] = targetRect;
-                                facesArray[1] = qrRect;
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        invalidate();
-                                    }
-                                });
+                        if (source != null) {
+                            //// TODO: 25.04.2017 add if (is drone flying?)
+                            Frame convFram = new Frame.Builder().setBitmap(source).build();
+                            SparseArray<Barcode> barcodes = detector.detect(convFram);
+                            if (barcodes.size() > 0) {
+                                //Log.d(TAG, barcodes.valueAt(0).displayValue);
+                                Log.d(TAG, "QR Code detected");
+
+                                Rect qrRect = barcodes.valueAt(0).getBoundingBox();
+                                Point[] qrPoints = barcodes.valueAt(0).cornerPoints;
+
+                                synchronized (lock) {
+                                    facesArray = new Rect[2];
+                                    facesArray[0] = targetRect;
+                                    facesArray[1] = qrRect;
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            invalidate();
+                                        }
+                                    });
+                                }
+                                //TODO : tester si qr code dans targetRect, ou targetRect dans le QRCode. Sinon, adjustMovements. Si oui, overOrder
+
+                                    adjustMovements(qrPoints);
+
+
+
+                            } else {
+                                noQRFound();
+                                if (getAltitude()<=0.4){
+                                    land();
+                                }
                             }
-                            //TODO : tester si qr code dans targetRect, ou targetRect dans le QRCode. Sinon, adjustMovements. Si oui, overOrder
-
-                            //adjustMovements(qrPoints);
-
-                        }else{
-                            noQRFound();
+                        }
+                        try {
+                            Thread.sleep(TIMEBETWEENSCAN);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
                         }
                     }
-                }
+                //}
+                //counter++;
             }
         }
         /**
@@ -192,46 +234,93 @@ public class BarcodeView extends View{
          */
         private void adjustMovements(Point[] qrPoints){
 
-            int qrWitdh = qrPoints[1].x - qrPoints[1].x;
-            int qrHeight = qrPoints[0].y - qrPoints[2].y;
             int qrLeft = qrPoints[0].x;
             int qrRight = qrPoints[1].x;
             int qrTop = qrPoints[0].y;
             int qrBottom = qrPoints[2].y;
 
+            int count = 0;
+            for (Point point:qrPoints) {
+                Log.v(TAG, "Point"+count+": ("+point.x+","+point.y+")");
+                count++;
+            }
+
+
+            //Log.d(TAG, "adjustMovement");
             //center point of the QR Square
-            Point qrMassPoint = new Point(qrPoints[1].x - (qrWitdh/2),qrPoints[0].y - (qrHeight/2));
+
+            Rect qrRectangle = new Rect(qrLeft,qrTop,qrRight,qrBottom);
+
+            int cX = qrRectangle.centerX();
+            int cY = qrRectangle.centerY();
+
+
+            //preparations in order to get the Virtual Stick Mode available
+            ((Aircraft)currentDrone).getFlightController().setVirtualStickModeEnabled(true,null);
+            ((Aircraft)currentDrone).getFlightController().setFlightOrientationMode(FlightOrientationMode.AIRCRAFT_HEADING,null);
+            ((Aircraft)currentDrone).getFlightController().setTerrainFollowModeEnabled(false,null);
+            ((Aircraft)currentDrone).getFlightController().setTripodModeEnabled(false,null);
+            Log.d(TAG,"something running: "+DJISDKManager.getInstance().getMissionControl().getRunningElement());
+
+
+            ((Aircraft)currentDrone).getFlightController().setRollPitchControlMode(RollPitchControlMode.VELOCITY);
+            ((Aircraft)currentDrone).getFlightController().setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
+            Log.d(TAG, "Virtual stick enabled:"+((Aircraft)currentDrone).getFlightController().isVirtualStickAdvancedModeEnabled());
+
             if(((Aircraft)currentDrone).getFlightController().isVirtualStickControlModeAvailable()){
+                Log.d(TAG, "virtual stick control mode available");
                 if(!((Aircraft)currentDrone).getFlightController().isVirtualStickAdvancedModeEnabled()){
                     ((Aircraft)currentDrone).getFlightController().setVirtualStickAdvancedModeEnabled(true);
                     Log.d(TAG, "Virtual Stick Advanced Mode enabled");
-                    ((Aircraft)currentDrone).getFlightController().setRollPitchControlMode(RollPitchControlMode.VELOCITY);
-                    ((Aircraft)currentDrone).getFlightController().setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
                 }
+                //Setting the control modes for Roll, Pitch and Yaw
+                ((Aircraft)currentDrone).getFlightController().setRollPitchControlMode(RollPitchControlMode.VELOCITY);
+                ((Aircraft)currentDrone).getFlightController().setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
+                ((Aircraft)currentDrone).getFlightController().setVerticalControlMode(VerticalControlMode.VELOCITY);
+                ((Aircraft)currentDrone).getFlightController().setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
+                ((Aircraft)currentDrone).getFlightController().getFlightAssistant().setLandingProtectionEnabled(false,null);
             }
             FlightControlData move = new FlightControlData(0,0,0,0);
-            if (qrMassPoint.x < targetRect.left){
+            if (cX < targetRect.left){
 
                 //move drone to right
-                move.setRoll(1);
+                Log.i(TAG,"move to left");
+                move.setPitch(-speed);
 
-            }else if(qrMassPoint.x> targetRect.right){
+            }else if(cX> targetRect.right){
+                Log.i(TAG,"move to right");
                 //move drone to left
-                move.setRoll(-1);
+                move.setPitch(speed);
             }
-            if (qrMassPoint.y < targetRect.bottom){
+            if (cY < targetRect.top){
+                Log.i(TAG,"move top");
                 //move drone top
-            }else if (qrMassPoint.y > targetRect.top){
+                move.setRoll(speed);
+            }else if (cY > targetRect.bottom){
                 //move drone bottom
-            }
-            if (targetRect.contains(qrLeft,qrTop,qrRight,qrBottom)){
-                //decrease altitude
-                move.setVerticalThrottle(-1);
-            }
+                Log.i(TAG,"move bottom");
 
-            ((Aircraft)currentDrone).getFlightController().sendVirtualStickFlightControlData(move,null);
-            // recevoir l'instance de baseProduct
-            //((Aircraft) BaseProduct).getFlightController().;
+                move.setRoll(-speed);
+            }
+           // if (targetRect.contains(qrLeft,qrTop,qrRight,qrBottom) || qrRectangle.contains(targetRect) || getAltitude()==0.4){
+            if (targetRect.contains(cX,cY)){
+                    if(landMode) {
+                        //decrease altitude
+                        Log.d(TAG, "Decrasing altitude");
+
+                        move.setVerticalThrottle(-speed);
+                    }
+                }
+
+            Log.d(TAG,"Virtual stick mode available?:"+((Aircraft)currentDrone).getFlightController().isVirtualStickControlModeAvailable());
+            ((Aircraft)currentDrone).getFlightController().sendVirtualStickFlightControlData(move, new CommonCallbacks.CompletionCallback() {
+                @Override
+                public void onResult(DJIError arg0) {
+                    if(arg0!=null) {
+                        Log.e(TAG, arg0.toString());
+                    }
+                }
+            });
         }
 
 
@@ -245,6 +334,22 @@ public class BarcodeView extends View{
          */
         private void overOrder(int qrValue, double cAlt){
 
+            if(landMode){
+                if (qrValue == 0){
+                    //currentDrone.land();
+                }else {
+                    //float down = (float)-(DELTAMETERMOVEMENT*cAlt);
+                    //currentDrone.moveDroneInMeters(0f,0f,down,0f); //try do go down
+                }
+            }
+        }
+
+        private void land (){
+            FlightControlData move = new FlightControlData(0,0,0,0);
+            if(landMode){
+                move.setVerticalThrottle(-speed);
+                ((Aircraft)currentDrone).getFlightController().sendVirtualStickFlightControlData(move,null);
+            }
         }
 
         /**
@@ -282,6 +387,11 @@ public class BarcodeView extends View{
         }
     }
 
+    public void setViewWidthHeight(int sWidth, int sHeight){
+        this.viewWidth = sWidth;
+        this.viewHeight = sHeight;
+    }
+
 
     public boolean isLandMode() {
         return landMode;
@@ -291,10 +401,14 @@ public class BarcodeView extends View{
         this.landMode = landMode;
     }
 
-    public String getAltitude(){
-        String result = "UltraSonic disabled";
+    public Float getAltitude(){
+        Float result =-1F;
         if (((Aircraft) currentDrone).getFlightController().getState().isUltrasonicBeingUsed()){
-            result = ((Aircraft) currentDrone).getFlightController().getState().getUltrasonicHeightInMeters()+"";
+            result = ((Aircraft) currentDrone).getFlightController().getState().getUltrasonicHeightInMeters();
+            if (result<0f){
+                result = ((Aircraft) currentDrone).getFlightController().getState().getAircraftLocation().getAltitude();
+            }
+
         }
         return result;
     }

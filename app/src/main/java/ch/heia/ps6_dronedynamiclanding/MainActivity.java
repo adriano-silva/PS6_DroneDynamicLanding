@@ -77,6 +77,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
             Log.e(TAG, "mVideoSurface is null");
         }
         interrupted=false;
+        //bcView.setViewWidthHeight(sWidth, sHeight);
+
         startAltitudeThread();
     }
 
@@ -163,6 +165,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
             mCodecManager = new DJICodecManager(this, surface, width, height);
             sHeight = height;
             sWidth = width;
+            bcView.setViewWidthHeight(sWidth,sHeight);
         }
     }
     @Override

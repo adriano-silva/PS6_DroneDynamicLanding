@@ -14,6 +14,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import dji.sdk.base.BaseProduct;
@@ -26,6 +27,7 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback,
     private ImageButton mBackBtn;
     private Aircraft currentDrone = null;
     private static final String TAG = MainActivity.class.getName();
+    private Marker marker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,11 +39,34 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback,
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(this);
+        mapFragment.getMapAsync(MapActivity.this);
         initUI();
-
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+    }
 
     /**
      * Manipulates the map once available.
@@ -56,19 +81,22 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback,
     public void onMapReady(GoogleMap googleMap) {
         double lat = currentDrone.getFlightController().getState().getAircraftLocation().getLatitude();
         double longi = currentDrone.getFlightController().getState().getAircraftLocation().getLongitude();
-        Log.d(TAG, lat+" "+longi);
+        Log.d(TAG, "Location: "+lat+" "+longi);
         LatLng aicraftLocation = new LatLng(lat, longi);
         setMarker(googleMap, aicraftLocation);
     }
 
     public void setMarker(GoogleMap googleMap, LatLng coordinate){
         mMap = googleMap;
-
+        if(marker!=null){
+            marker.remove();
+        }
+        marker = mMap.addMarker(new MarkerOptions().position(coordinate).title("Aicraft location"));
         // Add a marker at Aicraft location and move the camera
-        mMap.addMarker(new MarkerOptions().position(coordinate).title("Aicraft location"));
         mMap.setMaxZoomPreference(18);
-        mMap.setMinZoomPreference(1);
+        mMap.setMinZoomPreference(14);
         mMap.moveCamera(CameraUpdateFactory.newLatLng(coordinate));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(coordinate, mMap.getCameraPosition().zoom));
     }
 
     private void initUI() {
