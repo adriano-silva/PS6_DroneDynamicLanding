@@ -73,6 +73,8 @@ public class BarcodeView extends View{
 
     private static final int TIMEBETWEENSCAN = 100; //in ms
 
+    private int framesWithoutQR = 0; //The number of tests without a successful detection
+
 
     private static final String TAG = BarcodeView.class.getName();
 
@@ -184,12 +186,30 @@ public class BarcodeView extends View{
                             //// TODO: 25.04.2017 add if (is drone flying?)
                             Frame convFram = new Frame.Builder().setBitmap(source).build();
                             SparseArray<Barcode> barcodes = detector.detect(convFram);
+
+                            int index = -1;
+                            int lastVal = 100;
+                            for(int i = 0; i < barcodes.size(); i++){
+                                int cVal = 100;
+                                try {
+                                    cVal = Integer.parseInt(barcodes.valueAt(i).rawValue);
+                                }catch (NumberFormatException e){
+
+                                }
+                                if(cVal < lastVal){
+                                    index = i;
+                                    lastVal = cVal;
+                                }
+                            }
+
+
                             if (barcodes.size() > 0) {
+                                framesWithoutQR = 0;
                                 //Log.d(TAG, barcodes.valueAt(0).displayValue);
                                 Log.d(TAG, "QR Code detected");
 
-                                Rect qrRect = barcodes.valueAt(0).getBoundingBox();
-                                Point[] qrPoints = barcodes.valueAt(0).cornerPoints;
+                                Rect qrRect = barcodes.valueAt(index).getBoundingBox();
+                                Point[] qrPoints = barcodes.valueAt(index).cornerPoints;
 
                                 synchronized (lock) {
                                     facesArray = new Rect[2];
@@ -361,6 +381,7 @@ public class BarcodeView extends View{
          * movement as follow : currentDrone.moveDroneInMeters(0f,0f,0f,0f);
          */
         private void noQRFound(){
+            framesWithoutQR++;
             synchronized (lock) {
                 facesArray = new Rect[1];
                 facesArray[0] = targetRect;
@@ -370,6 +391,9 @@ public class BarcodeView extends View{
                         invalidate();
                     }
                 });
+            }
+            if (framesWithoutQR > 50){
+                currentDrone.getCamera().setFocusTarget(new PointF(targetRect.centerX(),targetRect.centerY()), null);
             }
         }
 
