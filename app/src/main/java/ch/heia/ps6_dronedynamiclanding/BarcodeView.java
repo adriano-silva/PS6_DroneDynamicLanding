@@ -49,34 +49,29 @@ import static android.R.attr.value;
 
 public class BarcodeView extends View{
 
+    private static final String TAG = BarcodeView.class.getName();
     private Context ctx;
     public CascadingThread mainThread = null;
 
     private TextureView cameraView = null;
-    private BaseProduct currentDrone = null;
+    private BaseProduct currentDrone = null;  //Instance of the Base Product from sdk (Drone)
 
-    private BarcodeDetector detector;
-    private Paint paint;
-    private Rect[] facesArray = null;
-    private final Object lock = new Object(); //Drawing mutex
+    private BarcodeDetector detector;   //Google Mobile Vision detector
 
-    private int viewWidth = -1;
-    private int viewHeight = -1;
+    private int viewWidth = -1; //Width of the view (Drone Camera)
+    private int viewHeight = -1; //Height of the view (Drone Camera)
 
-    private final int skipFrameLimit = 200;
-
-    private Rect targetRect = new Rect(500,275,750,515);
+    private Rect targetRect = new Rect(0,0,0,0);  //Target Rectangle in middle of screen
 
     private boolean landMode = false;
 
-    private Float speed = 0.2f;
-
-    private static final int TIMEBETWEENSCAN = 100; //in ms
-
+    private Float speed = 0.2f; //speed in meters/seconds for the drone movement
+    private static final int TIMEBETWEENSCAN = 100; //Sleep time between each QR Code scan
     private int framesWithoutQR = 0; //The number of tests without a successful detection
 
-
-    private static final String TAG = BarcodeView.class.getName();
+    private Paint paint;
+    private Rect[] facesArray = null;
+    private final Object lock = new Object(); //Drawing mutex
 
 
     public BarcodeView(Context context) {
@@ -106,6 +101,7 @@ public class BarcodeView extends View{
         }
         ctx=context;
 
+        //Painting of the target square
         paint = new Paint();
         paint.setAntiAlias(true);
         paint.setColor(Color.GREEN);
@@ -114,6 +110,7 @@ public class BarcodeView extends View{
 
         currentDrone = DJISDKManager.getInstance().getProduct();
 
+        //Setting the Focus and Exposure modes of the camera in auto mode
         currentDrone.getCamera().setFocusMode(SettingsDefinitions.FocusMode.AUTO, null);
         currentDrone.getCamera().setExposureMode(SettingsDefinitions.ExposureMode.PROGRAM, null);
 
@@ -132,10 +129,6 @@ public class BarcodeView extends View{
     }
 
     public void resume(final TextureView cameraView, int sWidth, int sHeight){
-        if(getVisibility() == View.VISIBLE){
-
-
-        }
         //this.viewWidth = sWidth;
         //this.viewHeight = sHeight;
         this.cameraView = cameraView;
@@ -167,29 +160,26 @@ public class BarcodeView extends View{
             interrupted = true;
         }
 
+        //Thread for scanning and moving the drone
         @Override
         public void run() {
 
-            int halfWidth = targetRect.width()/2;
-            int halfHeight = targetRect.height()/2;
             Log.d(TAG, "Thread started");
-            int counter = 0;
 
             while (!interrupted) {
-
-                /*if (counter == skipFrameLimit) {
-                    counter = 0;*/
                     if (viewWidth > -1 && viewHeight > -1) {
                         Bitmap source = cameraView.getBitmap();
-
                         if (source != null) {
                             if (getAltitude()<=0.4){
                                 land();
                             }
-                            //// TODO: 25.04.2017 add if (is drone flying?)
+                            // TODO: 25.04.2017 add if (is drone flying?)
+                            //Converting the Bitmap of the camera to a frame
                             Frame convFram = new Frame.Builder().setBitmap(source).build();
+                            //Detection of QR Codes in the frame
                             SparseArray<Barcode> barcodes = detector.detect(convFram);
 
+                            //Checking and storing of the QR Code with the lowest value
                             int index = -1;
                             int lastVal = 100;
                             for(int i = 0; i < barcodes.size(); i++){
@@ -211,6 +201,7 @@ public class BarcodeView extends View{
                                 //Log.d(TAG, barcodes.valueAt(0).displayValue);
                                 Log.d(TAG, "QR Code detected");
 
+                                //get boundingBox and cornerPoint of the QR Code
                                 Rect qrRect = barcodes.valueAt(index).getBoundingBox();
                                 Point[] qrPoints = barcodes.valueAt(index).cornerPoints;
 
@@ -225,12 +216,8 @@ public class BarcodeView extends View{
                                         }
                                     });
                                 }
-                                //TODO : tester si qr code dans targetRect, ou targetRect dans le QRCode. Sinon, adjustMovements. Si oui, overOrder
-
+                                    //Moving the drone in order to place it above the platform
                                     adjustMovements(qrPoints);
-
-
-
                             } else {
                                 noQRFound();
 
@@ -242,8 +229,6 @@ public class BarcodeView extends View{
                             e.printStackTrace();
                         }
                     }
-                //}
-                //counter++;
             }
         }
         /**
@@ -266,12 +251,8 @@ public class BarcodeView extends View{
                 count++;
             }
 
-
-            //Log.d(TAG, "adjustMovement");
-            //center point of the QR Square
-
+            //
             Rect qrRectangle = new Rect(qrLeft,qrTop,qrRight,qrBottom);
-
             int cX = qrRectangle.centerX();
             int cY = qrRectangle.centerY();
 
@@ -284,10 +265,6 @@ public class BarcodeView extends View{
             Log.d(TAG,"something running: "+DJISDKManager.getInstance().getMissionControl().getRunningElement());
 
 
-            ((Aircraft)currentDrone).getFlightController().setRollPitchControlMode(RollPitchControlMode.VELOCITY);
-            ((Aircraft)currentDrone).getFlightController().setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
-            Log.d(TAG, "Virtual stick enabled:"+((Aircraft)currentDrone).getFlightController().isVirtualStickAdvancedModeEnabled());
-
             if(((Aircraft)currentDrone).getFlightController().isVirtualStickControlModeAvailable()){
                 Log.d(TAG, "virtual stick control mode available");
                 if(!((Aircraft)currentDrone).getFlightController().isVirtualStickAdvancedModeEnabled()){
@@ -299,40 +276,43 @@ public class BarcodeView extends View{
                 ((Aircraft)currentDrone).getFlightController().setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
                 ((Aircraft)currentDrone).getFlightController().setVerticalControlMode(VerticalControlMode.VELOCITY);
                 ((Aircraft)currentDrone).getFlightController().setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
+
+                //Disabling the Landing Protection
                 ((Aircraft)currentDrone).getFlightController().getFlightAssistant().setLandingProtectionEnabled(false,null);
             }
+
+            //Creation of a FlightControlData to store the movement information
             FlightControlData move = new FlightControlData(0,0,0,0);
             if (cX < targetRect.left){
-
-                //move drone to right
+                //move drone to left
                 Log.i(TAG,"move to left");
                 move.setPitch(-speed);
 
             }else if(cX> targetRect.right){
+                //move drone to right
                 Log.i(TAG,"move to right");
-                //move drone to left
                 move.setPitch(speed);
             }
             if (cY < targetRect.top){
-                Log.i(TAG,"move top");
                 //move drone top
+                Log.i(TAG,"move top");
                 move.setRoll(speed);
             }else if (cY > targetRect.bottom){
                 //move drone bottom
                 Log.i(TAG,"move bottom");
-
                 move.setRoll(-speed);
             }
-           // if (targetRect.contains(qrLeft,qrTop,qrRight,qrBottom) || qrRectangle.contains(targetRect) || getAltitude()==0.4){
+
+            //Decreasing altitude if the Target square containes the middle point of the QR Code
             if (targetRect.contains(cX,cY)){
                     if(landMode) {
                         //decrease altitude
                         Log.d(TAG, "Decrasing altitude");
-
                         move.setVerticalThrottle(-speed);
                     }
                 }
 
+            //Sending the movement informations to the drone
             Log.d(TAG,"Virtual stick mode available?:"+((Aircraft)currentDrone).getFlightController().isVirtualStickControlModeAvailable());
             ((Aircraft)currentDrone).getFlightController().sendVirtualStickFlightControlData(move, new CommonCallbacks.CompletionCallback() {
                 @Override
@@ -352,9 +332,9 @@ public class BarcodeView extends View{
          * if the drone has to follow the 0 QR code it will try to go down, closer to the QR codes.
          * @param qrValue the value inside the QR code
          * @param cAlt the current altitude
+         * @deprecated Not used in this project
          */
         private void overOrder(int qrValue, double cAlt){
-
             if(landMode){
                 if (qrValue == 0){
                     //currentDrone.land();
@@ -365,6 +345,7 @@ public class BarcodeView extends View{
             }
         }
 
+        //Function to move down the drone, it will stop the motors once the drone has landed
         private void land (){
             FlightControlData move = new FlightControlData(0,0,0,0);
             if(landMode){
@@ -376,10 +357,7 @@ public class BarcodeView extends View{
         /**
          * Called when a frame does not contain any QR code, this increase the number of frame
          * without QR code and delete the previous rectangles drawn on the canvas. When a certain
-         * amount of frames without QR code are reached the autopilot is restarted.
-         * Since the two functionnalities (autonomous flight & detection of QR code) have not
-         * been tested together the startautopilot is commented and instead we set a default
-         * movement as follow : currentDrone.moveDroneInMeters(0f,0f,0f,0f);
+         * amount of frames without QR code are reached the camera adjust the focus
          */
         private void noQRFound(){
             framesWithoutQR++;
@@ -401,15 +379,6 @@ public class BarcodeView extends View{
         private void runOnUiThread(Runnable r) {
             handler.post(r);
         }
-
-        /**
-         * This is called to set a new altitude. Since the altitude could be used from within
-         * the run function, we use a mutex to ensure that no concurency problem will happen.
-         * @param alt the new altitude
-         */
-        public void setAltitude(double alt){
-
-        }
     }
 
     public void setViewWidthHeight(int sWidth, int sHeight){
@@ -422,10 +391,12 @@ public class BarcodeView extends View{
         return landMode;
     }
 
+    //Setter for the landMode boolean
     public void setLandMode(boolean landMode) {
         this.landMode = landMode;
     }
 
+    //Function returning the altitude calculated by the sonar or with the gps coordination if the can't return a good value
     public Float getAltitude(){
         Float result =-1F;
         if (((Aircraft) currentDrone).getFlightController().getState().isUltrasonicBeingUsed()){
