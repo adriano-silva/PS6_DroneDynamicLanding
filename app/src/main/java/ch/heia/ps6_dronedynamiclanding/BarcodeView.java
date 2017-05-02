@@ -183,6 +183,9 @@ public class BarcodeView extends View{
                         Bitmap source = cameraView.getBitmap();
 
                         if (source != null) {
+                            if (getAltitude()<=0.4){
+                                land();
+                            }
                             //// TODO: 25.04.2017 add if (is drone flying?)
                             Frame convFram = new Frame.Builder().setBitmap(source).build();
                             SparseArray<Barcode> barcodes = detector.detect(convFram);
@@ -230,9 +233,7 @@ public class BarcodeView extends View{
 
                             } else {
                                 noQRFound();
-                                if (getAltitude()<=0.4){
-                                    land();
-                                }
+
                             }
                         }
                         try {
