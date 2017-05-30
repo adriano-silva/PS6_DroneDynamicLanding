@@ -1,3 +1,8 @@
+/**
+ * Authors: DJI and Adriano Silva
+ * T3-F
+ * HEIA-FR 2017
+ */
 package ch.heia.ps6_dronedynamiclanding;
 import android.app.Activity;
 import android.content.Intent;
@@ -193,6 +198,10 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         });
     }
 
+    /**
+     * button click handler
+     * @param v view
+     */
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
@@ -211,6 +220,9 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         }
     }
 
+    /**
+     * Starts the thread that actualize the altitude number on the screen
+     */
     private void startAltitudeThread() {
         Thread th = new Thread(new Runnable() {
             public void run() {

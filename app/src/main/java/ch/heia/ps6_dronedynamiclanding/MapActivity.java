@@ -1,3 +1,8 @@
+/**
+ * Author: Adriano Silva
+ * T3-F
+ * HEIA-FR 2017
+ */
 package ch.heia.ps6_dronedynamiclanding;
 
 import android.content.Intent;
